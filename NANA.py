@@ -13,12 +13,8 @@ from selenium.webdriver.common.keys import Keys
 import time
 import os
 
-profile_dir=r"/Users/user/Library/Application Support/Google/Chrome/"    # 对应你的chrome的用户数据存放路径
-chrome_options=webdriver.ChromeOptions()
-chrome_options.add_argument("user-data-dir="+os.path.abspath(profile_dir))
-driver = webdriver.Chrome()
-
 # 注意构造请求的时候要加上header
+# 模拟新浪微博的登录跳转过程
 class Launcher:
     def __init__(self, username, password):
         self.username = username
@@ -127,56 +123,89 @@ class Launcher:
         album_page = response.read()
         print album_page
 
-def getCookies():
-    pass
-
-
 class NANA:
     def __init__(self):
         self.url = 'http://photo.weibo.com/1780481403/talbum/index#!/mode/1/page/'
         self.userAgent = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_4) AppleWebKit/537.36 (KHTML, like Gecko) ' \
              'Chrome/49.0.2623.112 Safari/537.36'
         self.headers = {'User-Agent':self.userAgent,'Connection':'keep-alive',}
+        self.driver = webdriver.Chrome()
+        self.pageIdx = 1
+        self.maxIdx = 1
+        self.fileHelper = FileHelper();
 
-    # 获取某一页面的所有HTML内容
+    def login(self, username, pwd):
+        self.driver.get('http://login.sina.com.cn/')
+        username_ele = self.driver.find_element_by_id('username')
+        pwd_ele = self.driver.find_element_by_id('password')
+        username_ele.send_keys(username)
+        pwd_ele.send_keys(pwd, Keys.RETURN)
+        time.sleep(5)
+
     def getPage(self, idx):
         try:
             url = self.url + str(idx)
-            request = urllib2.Request(url, headers =self.headers)
-            response = urllib2.urlopen(request)
-            content = response.read()
+            self.driver.get(url)
+            time.sleep(1) #需要加一些延时使得js代码可以执行
+            content = self.driver.page_source
             return content
-        except urllib2.URLError, e:
-            if hasattr(e,"reason"):
-                print u"错误原因" % e.reason
-                return None
+        except:
+            print u"连接失败"
+            return None
+
+    def getPageItem(self, idx):
+        content = self.getPage(idx)
+        if not content:
+            print '页面加载失败'
+
+        page_pattern = re.compile('<a href=.*?"pageTo" action-data="page=([0-9].*?)">.*?</a>')
+
+        img_pattern = re.compile('<li>.*?<dl class="m_photoItem m_photoItem_a phtItem_hv">.*?<a href="(.*?)">.*?<img src="(.*?)".*?/>'+
+                         '.*?</a>',re.S)
+        items = re.findall(img_pattern, content)
+
+        pages = re.findall(page_pattern, content)
+        # 更新最大页码
+        pages_int = [int(x) for x in pages]
+        self.maxIdx = max(pages_int)
+        return items
+
+    def savePageImg(self, idx):
+        items = self.getPageItem(idx)
+        for item in items:
+            big_img_url = re.sub('/small/', '/mw690/', item[1])
+            parts = item[1].split('/')
+            self.fileHelper.saveImg(big_img_url,parts[-1])
+
+    def close(self):
+        self.driver.close()
+
+
+class FileHelper:
+    # 创建目录
+    def __init__(self):
+        self.path = '/Users/user/Downloads/yifu'
+        if not self.path.endswith('/'):
+            self.path = self.path + '/'
+        if not os.path.exists(self.path):
+            os.makedirs(self.path)
+
+    def saveImg(self, imgurl, fileName):
+        response = urllib2.urlopen(imgurl)
+        data = response.read()
+        filepath = self.path + fileName
+        fp = open(filepath, 'wb')
+        fp.write(data)
+        print 'save img %s' % filepath
+        fp.close()
 
 
 if __name__=='__main__':
-    launcher = Launcher('675125417@qq.com','Liyuan201')
-    # print launcher.get_encrypted_name()
-    # print launcher.get_prelogin_params()
-    # print launcher.get_encrypted_pwd()
-    # launcher.login()
-    # cookieDict = {};
-    # for item in launcher.cookie:
-    #     cookieDict[item.name] = item.value
-    # print cookieDict
+    # launcher = Launcher('675125417@qq.com','Liyuan201')
 
-    driver.get('http://login.sina.com.cn/')
-    username_ele = driver.find_element_by_id('username')
-    pwd_ele = driver.find_element_by_id('password')
-    username_ele.send_keys('675125417@qq.com')
-    pwd_ele.send_keys('Liyuan201', Keys.RETURN)
-    time.sleep(5)
-    # driver.add_cookie(driver.get_cookies())
+    nana = NANA()
+    nana.login('675125417@qq.com','Liyuan201')
 
-    driver.get('http://photo.weibo.com/1780481403/talbum/index#!/mode/1/page/1')
-    time.sleep(1)
-
-    pagesrc = driver.page_source
-    pattern = re.compile('<li>.*?<dl class="m_photoItem m_photoItem_a phtItem_hv">.*?<a href="(.*?)">.*?<img src="(.*?)".*?/>'+
-                         '.*?</a>',re.S)
-    items = re.findall(pattern, pagesrc)
+    nana.savePageImg(1)
     print "print"
-    driver.close()
+    nana.close()
