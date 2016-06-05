@@ -1,6 +1,7 @@
 # coding:utf-8
 
 # 参考http://shrik3.com/2016/03/25/sina-login/的文章
+# 模拟微博登录流程
 
 import urllib2
 import cookielib

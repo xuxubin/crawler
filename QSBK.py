@@ -1,10 +1,8 @@
 # -*- coding:utf-8 -*-
 
-import urllib
+# 爬取糗事百科的内容,不需要登录
 import urllib2
 import re
-import thread
-import time
 
 class QSBK:
     def __init__(self):
@@ -93,8 +91,7 @@ class QSBK:
                 #输出该页的段子
                 self.getOneStory(pageStories,nowPage)
 
+
 if __name__=='__main__':
     spider = QSBK()
     spider.start()
-
-
